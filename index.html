@@ -249,16 +249,11 @@
         
         <div class="mt-6 pt-6 border-t border-neutral-200">
           <p class="text-neutral-400 mb-4">分享此订单链接给他人</p>
-          <div class="flex flex-col sm:flex-row">
-            <div class="flex-1 mb-3 sm:mb-0">
-              <input type="text" id="share-url" class="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all-300" readonly>
-            </div>
-            <button id="copy-url-btn" class="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center">
-              <i class="fa fa-copy mr-2"></i> 复制链接
+          <div class="flex">
+            <input type="text" id="share-url" class="flex-1 px-4 py-3 border border-neutral-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all-300" readonly>
+            <button id="copy-url-btn" class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-r-lg transition-all duration-300">
+              <i class="fa fa-copy"></i>
             </button>
-          </div>
-          <div class="mt-3 text-sm text-neutral-400">
-            <i class="fa fa-info-circle mr-1"></i> 此链接包含您的订单信息，请分享给信任的人
           </div>
         </div>
       </section>
@@ -608,51 +603,15 @@
       }, 1000);
     });
 
-    // 生成更短的分享链接
-    function generatePrettyUrl(orderData) {
-        // 创建更短的订单ID
-        const orderId = Math.random().toString(36).substr(2, 8);
-        
-        // 提取主要商品名称作为链接的一部分
-        let itemNames = '';
-        if (orderData.items && orderData.items.length > 0) {
-            // 取第一个商品名称的前3个字符
-            itemNames = orderData.items[0].name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').substr(0, 3);
-        }
-        
-        // 构建基本URL
-        let baseUrl = `${window.location.origin}${window.location.pathname}`;
-        
-        // 移除不需要的字段以减小数据大小
-        const minimalOrderData = {
-            items: orderData.items.map(item => ({
-                name: item.name,
-                price: item.price,
-                quantity: item.quantity
-            })),
-            total: orderData.total
-        };
-        
-        // 如果有备注，也包含在URL中
-        if (orderData.notes) {
-            minimalOrderData.notes = orderData.notes;
-        }
-        
-        // 使用Base64编码，使URL更短
-        const encodedOrder = btoa(JSON.stringify(minimalOrderData));
-        
-        // 组合更短的URL
-        return `${baseUrl}?o=${encodedOrder}&id=${itemNames}${orderId}`;
-    }
-
     // 更新分享链接
     function updateShareUrl() {
       // 获取当前订单数据
       const pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
                         {items: cartItems, total: totalPrice};
       
-      // 生成更短的分享链接
-      const shareUrl = generatePrettyUrl(pendingOrder);
+      // 生成包含最新数据的分享链接
+      const orderJson = encodeURIComponent(JSON.stringify(pendingOrder));
+      const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
       shareUrlInput.value = shareUrl;
     }
 
@@ -663,7 +622,7 @@
       
       // 显示复制成功提示
       const originalText = copyUrlBtn.innerHTML;
-      copyUrlBtn.innerHTML = '<i class="fa fa-check mr-2"></i> 已复制';
+      copyUrlBtn.innerHTML = '<i class="fa fa-check"></i>';
       copyUrlBtn.classList.add('bg-green-600');
       
       setTimeout(() => {
@@ -1074,11 +1033,10 @@
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
       
-      if (urlParams.has('o')) {
+      if (urlParams.has('order')) {
         try {
-          const encodedOrder = urlParams.get('o');
-          // 使用atob解码Base64字符串
-          const orderData = JSON.parse(atob(encodedOrder));
+          const encodedOrder = urlParams.get('order');
+          const orderData = JSON.parse(decodeURIComponent(encodedOrder));
           
           // 更新购物车
           cartItems = orderData.items || [];
@@ -1122,7 +1080,8 @@
           sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
           
           // 生成分享链接
-          updateShareUrl();
+          const shareUrl = `${window.location.origin}${window.location.pathname}?order=${encodedOrder}`;
+          shareUrlInput.value = shareUrl;
           
           // 显示确认页面
           appDiv.style.display = 'none';
