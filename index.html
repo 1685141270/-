@@ -610,26 +610,39 @@
 
     // 生成更短的分享链接
     function generatePrettyUrl(orderData) {
-        // 创建更短的随机ID
-        const randomId = Math.random().toString(36).substr(2, 6);
+        // 创建更短的订单ID
+        const orderId = Math.random().toString(36).substr(2, 8);
         
-        // 简化数据结构，只保留必要信息
-        const minimalData = {
-            i: orderData.items.map(item => [item.name, item.price, item.quantity]),
-            t: orderData.total
+        // 提取主要商品名称作为链接的一部分
+        let itemNames = '';
+        if (orderData.items && orderData.items.length > 0) {
+            // 取第一个商品名称的前3个字符
+            itemNames = orderData.items[0].name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').substr(0, 3);
+        }
+        
+        // 构建基本URL
+        let baseUrl = `${window.location.origin}${window.location.pathname}`;
+        
+        // 移除不需要的字段以减小数据大小
+        const minimalOrderData = {
+            items: orderData.items.map(item => ({
+                name: item.name,
+                price: item.price,
+                quantity: item.quantity
+            })),
+            total: orderData.total
         };
         
         // 如果有备注，也包含在URL中
-        if (orderData.notes) minimalData.n = orderData.notes;
+        if (orderData.notes) {
+            minimalOrderData.notes = orderData.notes;
+        }
         
-        // 使用URL安全的Base64编码（去除=，替换+和/）
-        const encodedData = btoa(JSON.stringify(minimalData))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=+$/, '');
+        // 使用Base64编码，使URL更短
+        const encodedOrder = btoa(JSON.stringify(minimalOrderData));
         
-        // 返回更短的URL格式
-        return `${window.location.origin}${window.location.pathname}#${encodedData}${randomId}`;
+        // 组合更短的URL
+        return `${baseUrl}?o=${encodedOrder}&id=${itemNames}${orderId}`;
     }
 
     // 更新分享链接
@@ -1150,4 +1163,4 @@
   </script>
 </body>
 
-</html>  
+</html>
