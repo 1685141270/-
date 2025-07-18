@@ -212,11 +212,14 @@
           <p class="text-lg font-medium text-neutral-600">您的宝宝向您发起一笔订单代付</p>
         </div>
         
-        <!-- 新增备注区域 -->
+        <!-- 备注区域 -->
         <div class="mb-6">
           <label for="order-notes" class="block text-left text-neutral-600 mb-2 font-medium">订单备注</label>
-          <textarea id="order-notes" rows="3" placeholder="请输入备注信息（如：不要香菜、少冰等）" 
+          <textarea id="order-notes" rows="3" placeholder="请输入备注信息（如：不要香菜、少冰等），输入后将自动保存" 
                     class="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all-300"></textarea>
+          <div id="notes-saved-indicator" class="hidden mt-1 text-success text-sm">
+            <i class="fa fa-check mr-1"></i> 备注已自动保存
+          </div>
         </div>
         
         <div class="border-t border-b border-neutral-200 py-4 my-4">
@@ -310,8 +313,9 @@
     const deleteOrderBtn = document.getElementById('delete-order-btn');
     const shareUrlInput = document.getElementById('share-url');
     const copyUrlBtn = document.getElementById('copy-url-btn');
-    // 新增备注相关元素
+    // 备注相关元素
     const orderNotesInput = document.getElementById('order-notes');
+    const notesSavedIndicator = document.getElementById('notes-saved-indicator');
 
     // 初始化购物车状态
     let cartItems = [];
@@ -518,9 +522,7 @@
       sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
       
       // 生成分享链接
-      const orderJson = encodeURIComponent(JSON.stringify(orderData));
-      const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
-      shareUrlInput.value = shareUrl;
+      updateShareUrl();
       
       // 清空备注输入框
       orderNotesInput.value = '';
@@ -563,6 +565,44 @@
         }, 50);
       }, 300);
     });
+
+    // 自动保存备注（当用户输入后延迟保存）
+    let notesSaveTimeout;
+    orderNotesInput.addEventListener('input', () => {
+      clearTimeout(notesSaveTimeout);
+      notesSaveTimeout = setTimeout(() => {
+        const notes = orderNotesInput.value.trim();
+        
+        // 获取当前订单数据
+        let pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
+                          {items: cartItems, total: totalPrice, notes: ''};
+        
+        // 更新备注
+        pendingOrder.notes = notes;
+        sessionStorage.setItem('pendingOrder', JSON.stringify(pendingOrder));
+        
+        // 更新分享链接
+        updateShareUrl();
+        
+        // 显示保存成功提示
+        notesSavedIndicator.classList.remove('hidden');
+        setTimeout(() => {
+          notesSavedIndicator.classList.add('hidden');
+        }, 2000);
+      }, 1000);
+    });
+
+    // 更新分享链接
+    function updateShareUrl() {
+      // 获取当前订单数据
+      const pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
+                        {items: cartItems, total: totalPrice, notes: ''};
+      
+      // 生成包含最新备注的分享链接
+      const orderJson = encodeURIComponent(JSON.stringify(pendingOrder));
+      const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
+      shareUrlInput.value = shareUrl;
+    }
 
     // 复制分享链接
     copyUrlBtn.addEventListener('click', () => {
@@ -660,7 +700,7 @@
       }, 800);
     });
 
-    // 保存订单到历史记录，新增备注参数
+    // 保存订单到历史记录，包含备注
     function saveOrderToHistory(status, notes) {
       const orderId = Date.now();
       const orderDate = new Date().toLocaleString();
@@ -1014,6 +1054,9 @@
           // 填充备注信息（如果有）
           orderNotesInput.value = orderData.notes || '';
           
+          // 保存到sessionStorage
+          sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
+          
           // 生成分享链接
           const shareUrl = `${window.location.origin}${window.location.pathname}?order=${encodedOrder}`;
           shareUrlInput.value = shareUrl;
@@ -1039,9 +1082,7 @@
           orderNotesInput.value = pendingOrder.notes || '';
           
           // 生成分享链接
-          const orderJson = encodeURIComponent(JSON.stringify(pendingOrder));
-          const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
-          shareUrlInput.value = shareUrl;
+          updateShareUrl();
         } catch (error) {
           console.error('解析待处理订单时出错:', error);
           sessionStorage.removeItem('pendingOrder');
