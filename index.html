@@ -249,11 +249,16 @@
         
         <div class="mt-6 pt-6 border-t border-neutral-200">
           <p class="text-neutral-400 mb-4">分享此订单链接给他人</p>
-          <div class="flex">
-            <input type="text" id="share-url" class="flex-1 px-4 py-3 border border-neutral-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all-300" readonly>
-            <button id="copy-url-btn" class="bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-r-lg transition-all duration-300">
-              <i class="fa fa-copy"></i>
+          <div class="flex flex-col sm:flex-row">
+            <div class="flex-1 mb-3 sm:mb-0">
+              <input type="text" id="share-url" class="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all-300" readonly>
+            </div>
+            <button id="copy-url-btn" class="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center">
+              <i class="fa fa-copy mr-2"></i> 复制链接
             </button>
+          </div>
+          <div class="mt-3 text-sm text-neutral-400">
+            <i class="fa fa-info-circle mr-1"></i> 此链接包含您的订单信息，请分享给信任的人
           </div>
         </div>
       </section>
@@ -513,12 +518,18 @@
         return;
       }
       
-      // 保存订单到sessionStorage，包含备注字段
+      // 保存订单到sessionStorage，只有在有备注时才包含备注字段
       const orderData = {
         items: cartItems,
-        total: totalPrice,
-        notes: '' // 初始为空，用户可以在确认页填写
+        total: totalPrice
       };
+      
+      // 只有当有备注时才添加备注字段
+      const initialNotes = orderNotesInput.value.trim();
+      if (initialNotes) {
+        orderData.notes = initialNotes;
+      }
+      
       sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
       
       // 生成分享链接
@@ -575,10 +586,15 @@
         
         // 获取当前订单数据
         let pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
-                          {items: cartItems, total: totalPrice, notes: ''};
+                          {items: cartItems, total: totalPrice};
         
-        // 更新备注
-        pendingOrder.notes = notes;
+        // 只有当有备注时才添加备注字段，否则移除该字段
+        if (notes) {
+          pendingOrder.notes = notes;
+        } else if (pendingOrder.hasOwnProperty('notes')) {
+          delete pendingOrder.notes;
+        }
+        
         sessionStorage.setItem('pendingOrder', JSON.stringify(pendingOrder));
         
         // 更新分享链接
@@ -592,15 +608,38 @@
       }, 1000);
     });
 
+    // 生成更短的分享链接
+    function generatePrettyUrl(orderData) {
+        // 创建更短的随机ID
+        const randomId = Math.random().toString(36).substr(2, 6);
+        
+        // 简化数据结构，只保留必要信息
+        const minimalData = {
+            i: orderData.items.map(item => [item.name, item.price, item.quantity]),
+            t: orderData.total
+        };
+        
+        // 如果有备注，也包含在URL中
+        if (orderData.notes) minimalData.n = orderData.notes;
+        
+        // 使用URL安全的Base64编码（去除=，替换+和/）
+        const encodedData = btoa(JSON.stringify(minimalData))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+        
+        // 返回更短的URL格式
+        return `${window.location.origin}${window.location.pathname}#${encodedData}${randomId}`;
+    }
+
     // 更新分享链接
     function updateShareUrl() {
       // 获取当前订单数据
       const pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
-                        {items: cartItems, total: totalPrice, notes: ''};
+                        {items: cartItems, total: totalPrice};
       
-      // 生成包含最新备注的分享链接
-      const orderJson = encodeURIComponent(JSON.stringify(pendingOrder));
-      const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
+      // 生成更短的分享链接
+      const shareUrl = generatePrettyUrl(pendingOrder);
       shareUrlInput.value = shareUrl;
     }
 
@@ -611,7 +650,7 @@
       
       // 显示复制成功提示
       const originalText = copyUrlBtn.innerHTML;
-      copyUrlBtn.innerHTML = '<i class="fa fa-check"></i>';
+      copyUrlBtn.innerHTML = '<i class="fa fa-check mr-2"></i> 已复制';
       copyUrlBtn.classList.add('bg-green-600');
       
       setTimeout(() => {
@@ -632,7 +671,7 @@
       setTimeout(() => {
         alert(`付款成功！金额：¥${totalPrice.toFixed(2)}`);
         
-        // 保存订单到历史记录，包含备注
+        // 保存订单到历史记录
         saveOrderToHistory('completed', orderNotes);
         
         // 清空购物车和待处理订单
@@ -672,7 +711,7 @@
       setTimeout(() => {
         alert('订单已拒绝');
         
-        // 保存订单到历史记录，包含备注
+        // 保存订单到历史记录
         saveOrderToHistory('cancelled', orderNotes);
         
         // 清空购物车和待处理订单
@@ -700,7 +739,7 @@
       }, 800);
     });
 
-    // 保存订单到历史记录，包含备注
+    // 保存订单到历史记录
     function saveOrderToHistory(status, notes) {
       const orderId = Date.now();
       const orderDate = new Date().toLocaleString();
@@ -717,9 +756,13 @@
         date: orderDate,
         items: orderItems,
         total: totalPrice,
-        status: status,
-        notes: notes || '' // 保存备注信息
+        status: status
       };
+      
+      // 只有当有备注时才添加备注字段
+      if (notes) {
+        order.notes = notes;
+      }
       
       orderHistory.unshift(order); // 添加到历史记录的开头
       localStorage.setItem('orderHistory', JSON.stringify(orderHistory));
@@ -840,7 +883,7 @@
         const statusText = order.status === 'completed' ? '已送达' : '已取消';
         
         // 显示备注摘要（如果有）
-        const hasNotes = order.notes && order.notes.trim() !== '';
+        const hasNotes = order.hasOwnProperty('notes') && order.notes && order.notes.trim() !== '';
         const notesSummary = hasNotes ? `<div class="text-xs text-neutral-500 mt-1"><i class="fa fa-sticky-note-o mr-1"></i> 有备注信息</div>` : '';
         
         orderElement.innerHTML = `
@@ -881,7 +924,7 @@
       });
     }
 
-    // 打开订单详情，显示备注信息
+    // 打开订单详情
     function openOrderDetail(orderId) {
       const order = orderHistory.find(order => order.id === orderId);
       if (!order) return;
@@ -892,15 +935,18 @@
       // 更新模态框标题
       modalTitle.textContent = `订单详情 #${order.id}`;
       
-      // 准备备注HTML
-      const notesHtml = order.notes && order.notes.trim() !== '' 
-        ? `<div class="border-t border-neutral-200 my-4 pt-4">
+      // 准备备注HTML（只有当有备注时才显示）
+      let notesHtml = '';
+      if (order.hasOwnProperty('notes') && order.notes && order.notes.trim() !== '') {
+        notesHtml = `
+          <div class="border-t border-neutral-200 my-4 pt-4">
             <h4 class="font-medium text-neutral-600 mb-3 flex items-center">
               <i class="fa fa-sticky-note-o text-primary mr-2"></i>备注信息
             </h4>
             <div class="bg-neutral-50 p-3 rounded-lg text-sm">${order.notes}</div>
-          </div>` 
-        : '';
+          </div>
+        `;
+      }
       
       // 更新模态框内容
       modalContent.innerHTML = `
@@ -1015,10 +1061,11 @@
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
       
-      if (urlParams.has('order')) {
+      if (urlParams.has('o')) {
         try {
-          const encodedOrder = urlParams.get('order');
-          const orderData = JSON.parse(decodeURIComponent(encodedOrder));
+          const encodedOrder = urlParams.get('o');
+          // 使用atob解码Base64字符串
+          const orderData = JSON.parse(atob(encodedOrder));
           
           // 更新购物车
           cartItems = orderData.items || [];
@@ -1051,15 +1098,18 @@
           
           confirmationTotal.textContent = `¥${totalPrice.toFixed(2)}`;
           
-          // 填充备注信息（如果有）
-          orderNotesInput.value = orderData.notes || '';
+          // 只有当有备注时才填充备注信息
+          if (orderData.hasOwnProperty('notes') && orderData.notes) {
+            orderNotesInput.value = orderData.notes;
+          } else {
+            orderNotesInput.value = '';
+          }
           
           // 保存到sessionStorage
           sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
           
           // 生成分享链接
-          const shareUrl = `${window.location.origin}${window.location.pathname}?order=${encodedOrder}`;
-          shareUrlInput.value = shareUrl;
+          updateShareUrl();
           
           // 显示确认页面
           appDiv.style.display = 'none';
@@ -1078,8 +1128,12 @@
           cartItems = pendingOrder.items;
           totalPrice = pendingOrder.total;
           
-          // 填充备注信息（如果有）
-          orderNotesInput.value = pendingOrder.notes || '';
+          // 只有当有备注时才填充备注信息
+          if (pendingOrder.hasOwnProperty('notes') && pendingOrder.notes) {
+            orderNotesInput.value = pendingOrder.notes;
+          } else {
+            orderNotesInput.value = '';
+          }
           
           // 生成分享链接
           updateShareUrl();
@@ -1096,4 +1150,4 @@
   </script>
 </body>
 
-</html>
+</html>  
