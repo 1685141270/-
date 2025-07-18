@@ -513,16 +513,16 @@
         return;
       }
       
-      // 保存订单到sessionStorage，只有在有备注时才包含备注字段
+      // 保存订单到sessionStorage，仅在有备注时包含备注字段
       const orderData = {
         items: cartItems,
         total: totalPrice
       };
       
-      // 只有当有备注时才添加备注字段
-      const initialNotes = orderNotesInput.value.trim();
-      if (initialNotes) {
-        orderData.notes = initialNotes;
+      // 只有当备注不为空时才添加到订单数据中
+      const notes = orderNotesInput.value.trim();
+      if (notes) {
+        orderData.notes = notes;
       }
       
       sessionStorage.setItem('pendingOrder', JSON.stringify(orderData));
@@ -583,10 +583,11 @@
         let pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
                           {items: cartItems, total: totalPrice};
         
-        // 只有当有备注时才添加备注字段，否则移除该字段
+        // 只有当备注不为空时才添加到订单数据中
         if (notes) {
           pendingOrder.notes = notes;
-        } else if (pendingOrder.hasOwnProperty('notes')) {
+        } else {
+          // 如果备注为空，则从订单数据中移除备注字段
           delete pendingOrder.notes;
         }
         
@@ -609,7 +610,7 @@
       const pendingOrder = JSON.parse(sessionStorage.getItem('pendingOrder')) || 
                         {items: cartItems, total: totalPrice};
       
-      // 生成包含最新数据的分享链接
+      // 生成包含最新备注的分享链接（如果有备注）
       const orderJson = encodeURIComponent(JSON.stringify(pendingOrder));
       const shareUrl = `${window.location.origin}${window.location.pathname}?order=${orderJson}`;
       shareUrlInput.value = shareUrl;
@@ -643,7 +644,7 @@
       setTimeout(() => {
         alert(`付款成功！金额：¥${totalPrice.toFixed(2)}`);
         
-        // 保存订单到历史记录
+        // 保存订单到历史记录，仅在有备注时包含备注字段
         saveOrderToHistory('completed', orderNotes);
         
         // 清空购物车和待处理订单
@@ -683,7 +684,7 @@
       setTimeout(() => {
         alert('订单已拒绝');
         
-        // 保存订单到历史记录
+        // 保存订单到历史记录，仅在有备注时包含备注字段
         saveOrderToHistory('cancelled', orderNotes);
         
         // 清空购物车和待处理订单
@@ -711,7 +712,7 @@
       }, 800);
     });
 
-    // 保存订单到历史记录
+    // 保存订单到历史记录，仅在有备注时包含备注字段
     function saveOrderToHistory(status, notes) {
       const orderId = Date.now();
       const orderDate = new Date().toLocaleString();
@@ -723,6 +724,7 @@
         orderItems = pendingOrder.items;
       }
       
+      // 创建订单对象
       const order = {
         id: orderId,
         date: orderDate,
@@ -731,9 +733,9 @@
         status: status
       };
       
-      // 只有当有备注时才添加备注字段
-      if (notes) {
-        order.notes = notes;
+      // 只有当备注不为空时才添加到订单数据中
+      if (notes && notes.trim() !== '') {
+        order.notes = notes.trim();
       }
       
       orderHistory.unshift(order); // 添加到历史记录的开头
@@ -854,9 +856,11 @@
         const statusClass = order.status === 'completed' ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger';
         const statusText = order.status === 'completed' ? '已送达' : '已取消';
         
-        // 显示备注摘要（如果有）
-        const hasNotes = order.hasOwnProperty('notes') && order.notes && order.notes.trim() !== '';
-        const notesSummary = hasNotes ? `<div class="text-xs text-neutral-500 mt-1"><i class="fa fa-sticky-note-o mr-1"></i> 有备注信息</div>` : '';
+        // 只有当备注存在且不为空时才显示"有备注"提示
+        const hasNotes = order.notes && order.notes.trim() !== '';
+        const notesSummary = hasNotes ? `<div class="text-xs text-primary mt-1 flex items-center">
+          <i class="fa fa-sticky-note-o mr-1"></i> 有备注
+        </div>` : '';
         
         orderElement.innerHTML = `
           <div class="p-4 flex justify-between items-center">
@@ -896,7 +900,7 @@
       });
     }
 
-    // 打开订单详情
+    // 打开订单详情，只在有备注时显示备注信息
     function openOrderDetail(orderId) {
       const order = orderHistory.find(order => order.id === orderId);
       if (!order) return;
@@ -907,18 +911,14 @@
       // 更新模态框标题
       modalTitle.textContent = `订单详情 #${order.id}`;
       
-      // 准备备注HTML（只有当有备注时才显示）
-      let notesHtml = '';
-      if (order.hasOwnProperty('notes') && order.notes && order.notes.trim() !== '') {
-        notesHtml = `
-          <div class="border-t border-neutral-200 my-4 pt-4">
+      // 只有当备注存在且不为空时才显示备注部分
+      const hasNotes = order.notes && order.notes.trim() !== '';
+      const notesHtml = hasNotes ? `<div class="border-t border-neutral-200 my-4 pt-4">
             <h4 class="font-medium text-neutral-600 mb-3 flex items-center">
               <i class="fa fa-sticky-note-o text-primary mr-2"></i>备注信息
             </h4>
             <div class="bg-neutral-50 p-3 rounded-lg text-sm">${order.notes}</div>
-          </div>
-        `;
-      }
+          </div>` : '';
       
       // 更新模态框内容
       modalContent.innerHTML = `
@@ -1069,8 +1069,8 @@
           
           confirmationTotal.textContent = `¥${totalPrice.toFixed(2)}`;
           
-          // 只有当有备注时才填充备注信息
-          if (orderData.hasOwnProperty('notes') && orderData.notes) {
+          // 只有当备注存在时才填充备注信息
+          if (orderData.notes) {
             orderNotesInput.value = orderData.notes;
           } else {
             orderNotesInput.value = '';
@@ -1100,8 +1100,8 @@
           cartItems = pendingOrder.items;
           totalPrice = pendingOrder.total;
           
-          // 只有当有备注时才填充备注信息
-          if (pendingOrder.hasOwnProperty('notes') && pendingOrder.notes) {
+          // 只有当备注存在时才填充备注信息
+          if (pendingOrder.notes) {
             orderNotesInput.value = pendingOrder.notes;
           } else {
             orderNotesInput.value = '';
